@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PageHeader from "../components/layout/PageHeader";
 import DataTable from "../components/common/DataTable";
 import StatusBadge from "../components/common/StatusBadge";
+import { inventoryApi } from "../api/inventoryApi";
 import { formatDate, formatMoney, formatNumber, getBillTotal, localDateInput } from "../utils/formatters";
 
 const emptyItem = () => ({ productId: "", quantity: "1", unitPrice: "0", expiryDate: "" });
@@ -16,6 +17,29 @@ export default function Bills({ products, bills, runAction, createBill, setBillS
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageData, setPageData] = useState({ bills: [], pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 15 } });
+  const [loadingPage, setLoadingPage] = useState(false);
+
+  useEffect(() => {
+    const fetchPage = async () => {
+      try {
+        setLoadingPage(true);
+        const response = await inventoryApi.getBillsPage({
+          page: currentPage,
+          limit: 15,
+        });
+        setPageData(response);
+      } catch (error) {
+        console.error("Failed to fetch bills page:", error);
+        setPageData({ bills: [], pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 15 } });
+      } finally {
+        setLoadingPage(false);
+      }
+    };
+
+    fetchPage();
+  }, [currentPage]);
 
   const updateItem = (index, key, value) => setItems((old) => old.map((item, i) => i === index ? { ...item, [key]: value } : item));
   const total = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
@@ -50,9 +74,12 @@ export default function Bills({ products, bills, runAction, createBill, setBillS
     }
   };
 
-  const supplierOptions = ["all", ...new Set((bills || []).map((bill) => bill.supplier).filter(Boolean))];
+  const supplierOptions = [
+    "all",
+    ...new Set((pageData.bills || []).map((bill) => bill.supplier).filter(Boolean)),
+  ];
 
-  const visibleBills = bills.filter((bill) => {
+  const visibleBills = (pageData.bills || []).filter((bill) => {
     const statusMatch = filter === "all" || (filter === "settled" ? bill.settled : !bill.settled);
     const supplierMatch = supplierFilter === "all" || bill.supplier === supplierFilter;
     return statusMatch && supplierMatch;
@@ -109,12 +136,43 @@ export default function Bills({ products, bills, runAction, createBill, setBillS
       <section className="card border-0 shadow-sm">
         <div className="card-body border-bottom p-3 p-md-4">
           <div className="row g-3 align-items-center">
-            <div className="col"><h2 className="h6 fw-semibold mb-1">All bills</h2><p className="small text-body-secondary mb-0">{visibleBills.length} invoices</p></div>
+            <div className="col"><h2 className="h6 fw-semibold mb-1">Recent bills</h2><p className="small text-body-secondary mb-0">{pageData.pagination?.totalCount ?? 0} invoices total · showing {visibleBills.length} on this page</p></div>
             <div className="col-12 col-md-3"><select className="form-select" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">All payment statuses</option><option value="unsettled">Unsettled only</option><option value="settled">Settled only</option></select></div>
             <div className="col-12 col-md-3"><select className="form-select" value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}><option value="all">All suppliers</option>{supplierOptions.filter((value) => value !== "all").map((supplierName) => <option key={supplierName} value={supplierName}>{supplierName}</option>)}</select></div>
           </div>
         </div>
-        <DataTable columns={columns} rows={visibleBills} emptyMessage="No bills match this filter." />
+
+        {loadingPage ? (
+          <div className="p-4 text-center text-body-secondary">Loading bills...</div>
+        ) : (
+          <>
+            <DataTable columns={columns} rows={visibleBills} emptyMessage="No bills match this filter." />
+
+            <div className="d-flex justify-content-between align-items-center p-3 border-top">
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                disabled={currentPage <= 1 || loadingPage}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              >
+                Previous
+              </button>
+
+              <div className="small text-body-secondary">
+                Page {pageData.pagination?.page || 1} of {pageData.pagination?.totalPages || 1}
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                disabled={currentPage >= (pageData.pagination?.totalPages || 1) || loadingPage}
+                onClick={() => setCurrentPage((page) => page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </>
   );
