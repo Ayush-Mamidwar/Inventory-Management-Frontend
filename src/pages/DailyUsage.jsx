@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/layout/PageHeader";
 import DataTable from "../components/common/DataTable";
+import { inventoryApi } from "../api/inventoryApi";
 import { formatDate, formatMoney, formatNumber, localDateInput } from "../utils/formatters";
 
 export default function DailyUsage({ products, usage, runAction, recordUsage }) {
@@ -11,7 +12,31 @@ export default function DailyUsage({ products, usage, runAction, recordUsage }) 
   const [selectedSourceId, setSelectedSourceId] = useState("");
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [dailyUsage, setDailyUsage] = useState([]);
+  const [loadingUsage, setLoadingUsage] = useState(false);
   const selected = products.find((p) => p.id === productId);
+
+  useEffect(() => {
+    const fetchDailyUsage = async () => {
+      if (!usedAt) {
+        setDailyUsage([]);
+        return;
+      }
+
+      try {
+        setLoadingUsage(true);
+        const rows = await inventoryApi.getUsage(usedAt);
+        setDailyUsage(rows || []);
+      } catch (error) {
+        console.error("Failed to fetch usage for the selected date:", error);
+        setDailyUsage([]);
+      } finally {
+        setLoadingUsage(false);
+      }
+    };
+
+    fetchDailyUsage();
+  }, [usedAt]);
 
   // const purchaseOptions = useMemo(() => {
   //   if (!selected) return [];
@@ -134,7 +159,13 @@ export default function DailyUsage({ products, usage, runAction, recordUsage }) 
     if (ok) { setQuantity("1"); setNotes(""); setSelectedSourceId(""); }
   };
 
-  const filtered = useMemo(() => usage.filter((entry) => entry.product.name.toLowerCase().includes(search.toLowerCase())), [usage, search]);
+  const filtered = useMemo(
+    () =>
+      (dailyUsage || []).filter((entry) =>
+        entry.product.name.toLowerCase().includes(search.toLowerCase())
+      ),
+    [dailyUsage, search]
+  );
 
   const columns = [
     { key: "product", label: "Product", render: (u) => <span className="fw-semibold">{u.product.name}</span> },
@@ -179,9 +210,34 @@ export default function DailyUsage({ products, usage, runAction, recordUsage }) 
 
       <section className="card border-0 shadow-sm">
         <div className="card-body border-bottom p-3 p-md-4">
-          <div className="row g-3 align-items-center"><div className="col"><h2 className="h6 fw-semibold mb-1">Usage history</h2><p className="small text-body-secondary mb-0">Previously recorded consumption.</p></div><div className="col-12 col-md-4"><input className="form-control" placeholder="Search by product" value={search} onChange={(e) => setSearch(e.target.value)} /></div></div>
+          <div className="row g-3 align-items-center">
+            <div className="col">
+              <h2 className="h6 fw-semibold mb-1">Usage on selected day</h2>
+              <p className="small text-body-secondary mb-0">
+                Showing only consumption recorded for {formatDate(usedAt)}.
+              </p>
+            </div>
+            <div className="col-12 col-md-4">
+              <input
+                className="form-control"
+                placeholder="Search by product"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
-        <DataTable columns={columns} rows={filtered} emptyMessage="No usage records found." renderModal={(entry) => <UsageDetails usageEntry={entry} />} />
+
+        {loadingUsage ? (
+          <div className="p-4 text-center text-body-secondary">Loading usage for this date...</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            emptyMessage="No usage records found for this day."
+            renderModal={(entry) => <UsageDetails usageEntry={entry} />}
+          />
+        )}
       </section>
     </>
   );

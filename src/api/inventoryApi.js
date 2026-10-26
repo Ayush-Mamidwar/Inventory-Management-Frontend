@@ -23,7 +23,8 @@ export const inventoryApi = {
   getBills: () => request("/bills"),
   getBillsPage: ({ page = 1, limit = 15 } = {}) =>
     request(`/bills?page=${page}&limit=${limit}`),
-  getUsage: () => request("/usage"),
+  getUsage: (date) =>
+    date ? request(`/usage?date=${encodeURIComponent(date)}`) : request("/usage"),
   createProduct: (payload) =>
     request("/products", { method: "POST", body: JSON.stringify(payload) }),
   updateProduct: (id, payload) =>
