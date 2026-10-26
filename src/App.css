@@ -1,0 +1,36 @@
+.app-shell {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.app-shell .card,
+.app-shell .table,
+.app-shell .form-control,
+.app-shell .form-select,
+.app-shell .btn,
+.app-shell .nav-link {
+  border-radius: 0.9rem;
+}
+
+.app-shell .card {
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  box-shadow: 0 0.5rem 1.5rem rgba(15, 23, 42, 0.04);
+}
+
+.app-shell .table-responsive {
+  border-radius: 0.85rem;
+  overflow: hidden;
+}
+
+@media (max-width: 767.98px) {
+  .app-shell .card-body {
+    padding: 1rem !important;
+  }
+
+  .app-shell .btn,
+  .app-shell .form-control,
+  .app-shell .form-select {
+    min-height: 44px;
+  }
+}
+
